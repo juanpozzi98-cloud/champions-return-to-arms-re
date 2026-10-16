@@ -1,0 +1,67 @@
+name: Probar Relay Champions en Windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  relay-windows:
+    runs-on: windows-2025
+    timeout-minutes: 15
+
+    steps:
+      - name: Obtener codigo de nuestro fork
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Adaptacion minima para Windows
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+
+          relay = Path("tools/play-web/relay/relay.py")
+          code = relay.read_text(encoding="utf-8")
+          old = "    try:\n        asyncio.run(Relay(args).main())"
+          new = (
+              "    if sys.platform == 'win32':\n"
+              "        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())\n"
+              "    try:\n"
+              "        asyncio.run(Relay(args).main())"
+          )
+          if old not in code:
+              raise RuntimeError("Cambio la estructura del Relay; revisar adaptacion")
+          relay.write_text(code.replace(old, new, 1), encoding="utf-8")
+
+          check = Path("tools/play-web/relay/check.py")
+          code = check.read_text(encoding="utf-8")
+          old = "os.getloadavg()[0]"
+          if old not in code:
+              raise RuntimeError("Cambio el medidor de carga del selftest")
+          code = code.replace(old, 'getattr(os, "getloadavg", lambda: (0.0,))()[0]')
+          check.write_text(code, encoding="utf-8")
+          '@ | Set-Content -Encoding utf8 adaptar_windows.py
+          python adaptar_windows.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Probar Relay en Windows
+        shell: pwsh
+        run: |
+          python -u tools/play-web/relay/check.py --selftest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Empaquetar Relay adaptado
+        uses: actions/upload-artifact@v4
+        with:
+          name: champions-relay-windows
+          path: |
+            tools/play-web/relay/relay.py
+            tools/play-web/relay/check.py
+          if-no-files-found: error
+          retention-days: 7
