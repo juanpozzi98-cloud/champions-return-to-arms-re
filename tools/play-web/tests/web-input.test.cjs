@@ -48,7 +48,7 @@ test("disconnected controllers are ignored", () => {
 	assert.equal(pickPad([pad(0, true, false)], -1), null);
 });
 test("pollInput avoids near-duplicate rAF/timer polls without missing the next 8ms poll", () => {
-	const input = section("let lastInputPoll = -Infinity;", "requestAnimationFrame(frame);");
+	const input = section("let lastInputPoll = -Infinity;", "\n\trequestAnimationFrame(frame);\n\tsetInterval(pollInput");
 	let time = 0, calls = 0;
 	const context = { performance: { now: () => time }, readInput: () => { calls++; },
 		requestAnimationFrame: () => {} };
