@@ -36,7 +36,7 @@ async function smoke(channel) {
 		page.on("pageerror", (error) => errors.push(error.message));
 		await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
 		await page.waitForFunction(() => window.rta && window.rta.state === "ready",
-			{ timeout: 90000 });
+			null, { timeout: 90000 });
 		const result = await page.evaluate(() => {
 			const state = window.rta;
 			return {
