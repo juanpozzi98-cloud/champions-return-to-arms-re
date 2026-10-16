@@ -1,0 +1,24 @@
+
+name: Probar Relay Champions
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probar-relay:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Descargar proyecto
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Probar servidor Relay
+        run: python tools/play-web/relay/check.py --selftest
