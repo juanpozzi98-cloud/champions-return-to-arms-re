@@ -2,6 +2,11 @@ name: Compilar Champions Web (experimental)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'tools/play-web/build.sh'
 
 permissions:
   contents: read
