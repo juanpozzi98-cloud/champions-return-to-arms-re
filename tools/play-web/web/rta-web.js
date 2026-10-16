@@ -552,10 +552,18 @@ function padBusy(pad) { return pad.buttons.some((button) => buttonValue(button) 
 // The controller in use is the one a button was pressed on last: a browser shows a
 // controller to a page only after a button press on it, and may list things that are none.
 function activePad() {
-	let pads = [];
-	try { pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter((pad) => pad && pad.connected) : []; } catch(e) { /* not allowed here */ }
-	let pad = pads.find((one) => one.index === padInUse) || null;
-	if(!pad || !padBusy(pad)) pad = pads.find((one) => one !== pad && padBusy(one)) || pad;
+	// The input is sampled often to keep controller latency low on Windows. Avoid
+	// allocating an array, filtering it and searching it twice on every sample.
+	let pad = null, preferred = null, firstBusy = null;
+	try {
+		const pads = navigator.getGamepads ? navigator.getGamepads() : null;
+		if(pads) for(const one of pads) {
+			if(!one || !one.connected) continue;
+			if(one.index === padInUse) preferred = one;
+			if(!firstBusy && padBusy(one)) firstBusy = one;
+		}
+		pad = preferred && padBusy(preferred) ? preferred : firstBusy || preferred;
+	} catch(e) { /* gamepads may not be allowed in this browser */ }
 	if(!pad) { padInUse = -1; return null; }
 	if(pad.index !== padInUse || pad.id !== padName) {
 		padInUse = pad.index;
@@ -1525,6 +1533,34 @@ ticker.onmessage = () => {
 };
 const sleep = (ms) => new Promise((resolve) => sleepers.push({ until: performance.now() + ms, resolve }));
 
+// Keep at most 90 once-per-second readings. No account name, disc path or server
+// address is included; the user can export these figures when a slowdown occurs.
+const perfHistory = [];
+function performanceReport() {
+	return {
+		format: "champions-web-performance-v1",
+		browser: check.browser,
+		renderer: check.has.renderer || "unknown",
+		worker_webgl: !!check.has.workerWebGl,
+		gl_main_thread: !!options.glMain,
+		picture_factor: options.factor,
+		samples: perfHistory.slice(),
+	};
+}
+function exportPerformance() {
+	if(!perfHistory.length) { notice("Run the emulator for a few seconds before collecting performance data.", true); return; }
+	const blob = new Blob([JSON.stringify(performanceReport(), null, 2)], { type: "application/json" });
+	const url = URL.createObjectURL(blob), link = document.createElement("a");
+	link.href = url;
+	link.download = "champions-performance.json";
+	document.body.appendChild(link);
+	link.click();
+	link.remove();
+	setTimeout(() => URL.revokeObjectURL(url), 60000);
+	notice("Saved a performance report from the last " + perfHistory.length + " seconds. No disc image, login or relay address is included.", false, 12000);
+}
+$("perfExport").addEventListener("click", exportPerformance);
+
 let lastInfo = null, lastRates = null;
 setInterval(() => {
 	if(!module || !running) return;
@@ -1532,6 +1568,8 @@ setInterval(() => {
 	watch(now);
 	if(lastInfo) {
 		lastRates = rates(lastInfo, now);
+		perfHistory.push({ since_start_seconds: Math.round(performance.now() / 1000), ...lastRates });
+		if(perfHistory.length > 90) perfHistory.shift();
 		speedElement.textContent = pausedBy ? "paused" : lastRates.fps.toFixed(1) + " frames/s";
 		speedElement.title = "machine " + lastRates.machine_ms_per_frame.toFixed(1) + " ms a frame, video " + lastRates.video_ms_per_frame.toFixed(1) + " ms a frame (16.7 is the limit)";
 		if(options.report) {
@@ -1564,6 +1602,7 @@ const rta = window.rta = {
 	B, options, log, checkDisc, fileReader, urlReader, boot,
 	info: () => info(),
 	last: () => lastRates,
+	performanceReport: () => performanceReport(),
 	peek: (address, size = 4) => module._rtaPeek(address, size) >>> 0,
 	poke: (address, size, value) => module._rtaPoke(address, size, value),
 	string: (address, limit = 32) => {
@@ -1964,9 +2003,19 @@ async function start() {
 	}
 	shared = module._rtaShared() >> 2;
 	module.HEAPU32[shared + 6] = options.limit ? 1 : 0;
-	const frame = () => { readInput(); requestAnimationFrame(frame); };
+	// Chromium on Windows benefits from keeping the 8 ms timer active for frame
+	// pacing. rAF and that timer often fire in the same few milliseconds: only
+	// sample the controller once, while key events still update input immediately.
+	let lastInputPoll = -Infinity;
+	const pollInput = () => {
+		const now = performance.now();
+		if(now - lastInputPoll < 7) return;
+		lastInputPoll = now;
+		readInput();
+	};
+	const frame = () => { pollInput(); requestAnimationFrame(frame); };
 	requestAnimationFrame(frame);
-	setInterval(readInput, 8); // also when the page is not being painted
+	setInterval(pollInput, 8); // also when the page is not being painted
 	rta.state = "ready";
 	performance.mark("rta-ready");
 	showMute();
