@@ -1,0 +1,50 @@
+name: Probar compilacion Lobby Windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compilar-lobby:
+    runs-on: windows-2025
+    timeout-minutes: 60
+
+    steps:
+      - name: Obtener fuente del lobby corregido
+        uses: actions/checkout@v4
+        with:
+          repository: TrustlessMike/Champions-Reborn-Server
+          ref: e693af17708c5e94f1762c0939cce7734f9072d9
+          persist-credentials: false
+
+      - name: Preparar MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Compilar servidor para Windows x64 (experimental)
+        shell: pwsh
+        run: |
+          msbuild '.\Champions Reborn Server.vcxproj' /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /verbosity:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Comprobar el ejecutable
+        shell: pwsh
+        run: |
+          Get-ChildItem '.\bin' | Select-Object Name, Length
+          if (-not (Test-Path '.\bin\Server_64.exe')) {
+            throw 'No se ha generado bin/Server_64.exe'
+          }
+          if (-not (Test-Path '.\bin\config.ini')) {
+            throw 'Falta bin/config.ini'
+          }
+
+      - name: Guardar binarios
+        uses: actions/upload-artifact@v4
+        with:
+          name: champions-lobby-windows
+          path: |
+            bin/Server_64.exe
+            bin/config.ini
+          if-no-files-found: error
+          retention-days: 7
