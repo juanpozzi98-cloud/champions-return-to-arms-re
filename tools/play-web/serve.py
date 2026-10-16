@@ -121,11 +121,18 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path == "/report" and self.report:
             try:
                 data = json.loads(body)
+                if not isinstance(data, dict):
+                    raise ValueError("a report must be a JSON object")
                 data["at"] = round(time.time(), 2)
-                data["load"] = round(os.getloadavg()[0], 1)
+                # os.getloadavg() is unavailable on Windows; the diagnostic endpoint
+                # must still accept browser reports without that optional field.
+                try:
+                    data["load"] = round(os.getloadavg()[0], 1)
+                except (AttributeError, OSError):
+                    pass
                 with open(self.report, "a") as out:
                     out.write(json.dumps(data) + "\n")
-            except ValueError:
+            except (ValueError, OSError):
                 pass
         self.send_response(204)
         self.send_header("Content-Length", "0")

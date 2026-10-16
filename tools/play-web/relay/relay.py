@@ -1355,6 +1355,10 @@ def main():
     parser.add_argument("--byte-rate", type=float, default=262144, help="bytes a second from one page (default 262144)")
     parser.add_argument("--connect-timeout", type=float, default=10)
     args = parser.parse_args()
+    # On Python 3.12 Windows, the relay needs the socket-compatible event loop
+    # for its UDP handlers; don't depend on a CI script to patch this at runtime.
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     try:
         asyncio.run(Relay(args).main())
     except KeyboardInterrupt:

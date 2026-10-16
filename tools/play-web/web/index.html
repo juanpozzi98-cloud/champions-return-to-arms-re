@@ -139,6 +139,10 @@
 		<div class="row"><label for="volume">Volume</label> <input type="range" id="volume" min="0" max="100" step="5" value="100"> <span id="volumeSay">100 %</span></div>
 		<h2>Picture</h2>
 		<p><i>Picture</i> in the bar above is how finely the picture is computed: 2× suits most computers. If the frames-a-second figure beside it stays under 60, take 1×.</p>
+		<h2>Performance diagnostics</h2>
+		<p>If the game slows down during spells or explosions, keep it visible for a few seconds and save the last 90 seconds of frame timings. The report includes the browser and graphics renderer, but no game image, player name, disc path or online server address.</p>
+		<div class="row"><button id="perfExport" type="button">Save performance report…</button></div>
+		<p>On Windows, keep the game tab in front, enable hardware acceleration, and exclude this site from browser energy-saving or sleeping-tab rules when playing online.</p>
 		<h2>Touch screen</h2>
 		<div class="row"><label for="touchMode">On-screen pad</label> <select id="touchMode"><option value="auto">when the screen is touched</option><option value="on">always</option><option value="off">never</option></select></div>
 		<h2>Saved games</h2>

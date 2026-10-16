@@ -1,0 +1,78 @@
+name: Probar web Chrome y Edge en Windows (experimental)
+
+on:
+  push:
+    branches:
+      - experimentos/windows-chromium-2026
+    paths:
+      - 'tools/play-web/**'
+      - '.github/workflows/comprobar-chromium-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compilar-linux:
+    name: Compilar WebAssembly + tests JavaScript
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Comprobar sintaxis y tests de mandos
+        run: |
+          node --check tools/play-web/web/rta-web.js
+          node --check tools/play-web/web/rta-sound.js
+          node --test tools/play-web/tests/web-input.test.cjs
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Instalar herramientas de compilación
+        run: python -m pip install --upgrade cmake ninja
+      - uses: emscripten-core/setup-emsdk@v15
+        with:
+          version: '6.0.12'
+      - name: Compilar Play! con optimizaciones conservadoras
+        run: bash tools/play-web/build.sh
+      - name: Verificar binarios y headers del servidor
+        run: |
+          test -s local/play-web-site/Play.wasm
+          test -s local/play-web-site/Play.js
+          test -f local/play-web-site/rta-web.js
+          test -f local/play-web-site/index.html
+          python -m py_compile tools/play-web/serve.py
+          python -m py_compile tools/play-web/relay/relay.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: champions-web-windows-test
+          path: local/play-web-site/
+          retention-days: 7
+
+  probar-windows:
+    name: Iniciar Play! en Chrome y Edge reales (Windows)
+    needs: compilar-linux
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: champions-web-windows-test
+          path: local/play-web-site
+      - name: Instalar controlador Playwright (sin descargar navegadores)
+        shell: pwsh
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: npm --prefix tools/play-web/tests install --no-save --no-package-lock playwright@1.56.1
+      - name: Comprobar arranque y diagnósticos Chromium
+        shell: pwsh
+        run: node tools/play-web/tests/windows-smoke.cjs
+      - name: Probar Relay con dos sesiones y UDP sobre Windows
+        shell: pwsh
+        run: python -u tools/play-web/relay/windows_smoke.py
