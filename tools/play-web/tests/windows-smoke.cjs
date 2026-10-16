@@ -5,11 +5,13 @@ const { chromium } = require("playwright");
 const { spawn } = require("node:child_process");
 const http = require("node:http");
 const path = require("node:path");
+const fs = require("node:fs");
 const assert = require("node:assert/strict");
 
 const root = path.resolve(__dirname, "../../..");
 const site = path.join(root, "local", "play-web-site");
 const url = "http://127.0.0.1:8973/";
+const reportPath = path.join(root, "local", "ci-windows-report.jsonl");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function ready() {
@@ -23,6 +25,23 @@ async function ready() {
 		await sleep(500);
 	}
 	throw new Error("The local test server did not start");
+}
+
+async function checkWindowsReport() {
+	const data = Buffer.from(JSON.stringify({ kind: "windows-browser-smoke", fps: 60 }));
+	const status = await new Promise((resolve, reject) => {
+		const request = http.request(url + "report", {
+			method: "POST",
+			headers: { "Content-Type": "application/json", "Content-Length": data.length },
+		}, (response) => { response.resume(); resolve(response.statusCode); });
+		request.on("error", reject);
+		request.end(data);
+	});
+	assert.equal(status, 204, "Local report endpoint must accept JSON on Windows");
+	const rows = fs.readFileSync(reportPath, "utf8").trim().split("\n");
+	assert.ok(rows.some((row) => JSON.parse(row).kind === "windows-browser-smoke"),
+		"Local Windows server did not persist the performance sample");
+	console.log("Windows local report endpoint: OK");
 }
 
 async function smoke(channel) {
@@ -59,13 +78,14 @@ async function smoke(channel) {
 }
 
 (async () => {
-	const server = spawn("python", ["tools/play-web/serve.py", "--site", site], {
+	const server = spawn("python", ["tools/play-web/serve.py", "--site", site, "--report", reportPath], {
 		cwd: root, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
 	});
 	let stderr = "";
 	server.stderr.on("data", (chunk) => { stderr += String(chunk); });
 	try {
 		await ready();
+		await checkWindowsReport();
 		for(const channel of ["chrome", "msedge"]) await smoke(channel);
 	} finally {
 		server.kill();
