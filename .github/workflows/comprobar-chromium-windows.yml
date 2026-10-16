@@ -73,3 +73,6 @@ jobs:
       - name: Comprobar arranque y diagnósticos Chromium
         shell: pwsh
         run: node tools/play-web/tests/windows-smoke.cjs
+      - name: Probar Relay con dos sesiones y UDP sobre Windows
+        shell: pwsh
+        run: python -u tools/play-web/relay/windows_smoke.py
