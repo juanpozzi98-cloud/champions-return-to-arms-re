@@ -1,0 +1,54 @@
+name: Compilar Champions Web (experimental)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compilar:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Obtener codigo del fork
+        uses: actions/checkout@v4
+
+      - name: Preparar Python en GitHub
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Instalar herramientas
+        run: python -m pip install --upgrade cmake ninja
+
+      - name: Preparar Emscripten
+        uses: emscripten-core/setup-emsdk@v15
+        with:
+          version: '6.0.12'
+
+      - name: Verificar versiones
+        run: |
+          cmake --version
+          ninja --version
+          emcc --version
+
+      - name: Compilar Open Champions Web
+        shell: bash
+        run: bash tools/play-web/build.sh
+
+      - name: Comprobar archivos generados
+        shell: bash
+        run: |
+          test -s local/play-web-site/index.html
+          find local/play-web-site -type f -name '*.wasm' | grep -q .
+          ls -lah local/play-web-site
+
+      - name: Empaquetar web para descarga
+        uses: actions/upload-artifact@v4
+        with:
+          name: champions-web-site
+          path: local/play-web-site/
+          if-no-files-found: error
+          retention-days: 7
