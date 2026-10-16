@@ -3,6 +3,7 @@
 # commit tools/play-net was written against, with tools/play-net/play-net.patch (the
 # changes this game needs in the emulator's core), play-web.patch (what a browser needs on
 # top of that), perf.patch (less work per frame, on top of both: docs/issues/browser-perf.md),
+# safari.patch (retains VU1 translated blocks when game graphics programs alternate),
 # the sources in src/ and - for online play - the desktop application's network and online
 # driver (tools/play-net/src: RtaNet, RtaOnline), compiled to WebAssembly with Emscripten.
 #
@@ -73,6 +74,7 @@ apply() {
 apply play-net "$HERE/../play-net/play-net.patch"
 apply play-web "$HERE/play-web.patch"
 apply perf "$HERE/perf.patch"
+apply safari "$HERE/safari.patch"
 
 # our sources: the front end, and for online play the desktop application's network and
 # online driver as they are (only what has changed is copied, so that a second run
@@ -132,9 +134,9 @@ cat > "$LICENCES/README.txt" <<NOTE
 This page runs the Play! PlayStation 2 emulator (https://github.com/jpd002/Play-), by
 Jean-Philip Desjardins and contributors, under the BSD 2-clause licence
 (Play-LICENSE.txt), compiled to WebAssembly with Emscripten, with changes by the
-Champions RE project for playing Champions: Return to Arms. The changes are two patches
+Champions RE project for playing Champions: Return to Arms. The changes are patches
 and source files published in that project (tools/play-net/play-net.patch,
-tools/play-web: play-web.patch, src/, web/); Play! was taken at commit
+tools/play-web: play-web.patch, perf.patch, safari.patch, src/, web/); Play! was taken at commit
 $COMMIT.
 
 It is not an official product of the Play! project, of Sony Computer Entertainment, of
