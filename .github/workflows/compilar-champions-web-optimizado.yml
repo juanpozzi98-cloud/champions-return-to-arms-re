@@ -1,0 +1,60 @@
+name: Champions Web - Optimizado (Wasm EH)
+
+# Compilacion alternativa de rendimiento. No toca la version actual de Pages.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compilar:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Obtener codigo del fork
+        uses: actions/checkout@v4
+
+      - name: Preparar Python en GitHub
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Instalar herramientas
+        run: python -m pip install --upgrade cmake ninja
+
+      - name: Preparar Emscripten
+        uses: emscripten-core/setup-emsdk@v15
+        with:
+          version: '6.0.12'
+
+      - name: Verificar versiones
+        run: |
+          cmake --version
+          ninja --version
+          emcc --version
+
+      - name: Compilar Champions Web con excepciones WebAssembly
+        shell: bash
+        env:
+          # Opcion incluida en perf.patch; elimina wrappers JS para excepciones.
+          # El workflow usa una carpeta de compilacion limpia.
+          RTA_CMAKE_ARGS: '-DRTA_WASM_EXCEPTIONS=ON'
+        run: bash tools/play-web/build.sh
+
+      - name: Comprobar archivos generados
+        shell: bash
+        run: |
+          test -s local/play-web-site/index.html
+          test -s local/play-web-site/Play.wasm
+          test -s local/play-web-site/Play.js
+          ls -lah local/play-web-site
+
+      - name: Empaquetar web optimizada para pruebas
+        uses: actions/upload-artifact@v4
+        with:
+          name: champions-web-optimizado-wasm-eh
+          path: local/play-web-site/
+          if-no-files-found: error
+          retention-days: 7
